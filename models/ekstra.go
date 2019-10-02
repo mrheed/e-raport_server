@@ -51,7 +51,7 @@ func (e *EkstraStruct) findAndExist(filter bson.M) bool {
 }
 
 func (e *EkstraStruct) marshal(bson.M) (EkstraStruct, error) {
-
+	return EkstraStruct{}, nil
 }
 
 func (e *EkstraStruct) InsertEkstraData(data []EkstraStruct) error {
