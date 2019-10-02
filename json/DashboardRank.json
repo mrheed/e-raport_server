@@ -1,0 +1,168 @@
+[
+	{"$sort": {"nis": 1}},
+    {"$sort": {"tahun_masuk": 1}},
+    {"$lookup": {
+        "from": "c_application_setting",
+        "pipeline": [{"$project": {
+            "kelas_xii": {"$add": ["$tahun_ajaran", -2]},
+            "kelas_xi": {"$add": ["$tahun_ajaran", -1]},
+            "kelas_x": "$tahun_ajaran"
+        }}],
+        "as": "setting"
+    }},
+    {"$unwind": "$setting"},
+    {"$project": {
+        "nama": 1,
+        "nis": 1,
+        "jurusan": "$jurusan",
+        "jenis_kelamin": "$jeniskelamin",
+        "tahun_masuk": 1,
+        "setting": 1,
+        "isCurrentStudent": {"$or": [
+            {"$eq": ["$tahun_masuk", "$setting.kelas_x"]}, 
+            {"$eq": ["$tahun_masuk", "$setting.kelas_xi"]}, 
+            {"$eq": ["$tahun_masuk", "$setting.kelas_xii"]}
+        ]} 
+    }},
+    {"$match": {"isCurrentStudent": true}},
+    {"$lookup": {
+        "from": "c_daftar_nilai_uh",
+        "let": {"nis": "$nis", "tahun_ajaran": "$setting.kelas_x"},
+        "pipeline": [
+            {"$match": {"$and": [{"$expr": {"$eq": ["$$nis", "$nis"]}}, {"$expr": {"$eq": ["$$tahun_ajaran", "$tahun_ajaran"]}}]}}
+        ],
+        "as": "duh"
+    }},
+    {"$lookup": {
+        "from": "c_daftar_nilai_tugas",
+        "let": {"nis": "$nis", "tahun_ajaran": "$setting.kelas_x"},
+        "pipeline": [
+            {"$match": {"$and": [{"$expr": {"$eq": ["$$nis", "$nis"]}}, {"$expr": {"$eq": ["$$tahun_ajaran", "$tahun_ajaran"]}}]}}
+        ],
+        "as": "tugas"
+    }},
+    {"$lookup": {
+        "from": "c_daftar_nilai_pts_pas",
+        "let": {"nis": "$nis", "tahun_ajaran": "$setting.kelas_x"},
+        "pipeline": [
+            {"$match": {"$and": [{"$expr": {"$eq": ["$$nis", "$nis"]}}, {"$expr": {"$eq": ["$$tahun_ajaran", "$tahun_ajaran"]}}]}}
+        ],
+        "as": "ptpas"
+    }},
+    {"$lookup": {
+        "from": "c_jurusan",
+		"let": {"tahun_ajaran": "$setting.kelas_x", "kode_kelas": "$jurusan.kode_kelas"},
+		"pipeline": [
+			{"$match": {"$and": [{"$expr": {"$eq": ["$tahun_ajaran", "$$tahun_ajaran"]}},{"$expr": {"$eq": ["$kode_kelas", "$$kode_kelas"]}}]}}
+		],
+        "as": "klass" 
+    }},
+    {"$unwind": "$klass"},
+    {"$lookup": {
+        "from": "c_teacher",
+        "let": {"kelas": "$klass.kode_kelas", "tahun_ajaran": "$tahun_masuk"},
+        "pipeline": [
+            {"$match": {"$and": [
+				{"$expr": {"$eq": ["$$tahun_ajaran", "$wali.tahun_ajaran"]}}, 
+				{"$expr": {"$eq": ["$wali.kode_kelas", "$$kelas"]}}
+			]}}
+        ],
+        "as": "teacher"
+    }},
+    {"$project": {
+        "_id": 0,
+        "nis": 1,
+        "tahun_masuk": 1,
+        "nama": 1,
+        "teacher": 1,
+        "kelas": {"$concat": [
+            {
+                "$switch": {
+                    "branches": [
+                        {
+                            "case": {"$eq": ["$tahun_masuk", "$setting.kelas_x"]},
+                            "then": "X"
+                        },
+                        {
+                            "case": {"$eq": ["$tahun_masuk", "$setting.kelas_xi"]},
+                            "then": "XI"
+                        },
+                        {
+                            "case": {"$eq": ["$tahun_masuk", "$setting.kelas_xii"]},
+                            "then": "XII"
+                        }
+                    ],
+                    "default": "Other"
+                }
+            }, " ", "$klass.nama_kelas"
+        ]},
+        "jt": {"$size": "$tugas.nilai_tugas"},
+        "juh": {"$size": "$duh.nilai_ulangan"},
+        "jptpas": {"$size": "$ptpas.nilai_ulangan"},
+        "avg": {"$let": {
+            "vars": {
+                "sum_duh": {"$sum":"$duh.nilai_ulangan"},
+                "sum_ptpas": {"$sum":"$ptpas.nilai_ulangan"},
+                "sum_tugas": {"$sum":"$tugas.nilai_tugas"},
+                "size_tugas": {"$size":"$tugas.nilai_tugas"},
+                "size_duh": {"$size":"$duh.nilai_ulangan"},
+                "size_ptpas": {"$size":"$ptpas.nilai_ulangan"}
+            },
+            "in": {"$divide": 
+                [{"$sum": [
+                        {"$divide": ["$$sum_duh", {"$cond": ["$$size_duh", "$$size_duh", 1]}]},
+                        {"$divide": ["$$sum_ptpas", {"$cond": ["$$size_ptpas", "$$size_ptpas", 1]}]},
+                        {"$divide": ["$$sum_tugas", {"$cond": ["$$size_tugas", "$$size_tugas", 1]}]}
+                    ]
+                }, 
+                    {"$cond": [
+                        {"$sum": [
+                            {"$cond": ["$$size_tugas", 1, 0]},
+                            {"$cond": ["$$size_ptpas", 1, 0]},
+                            {"$cond": ["$$size_duh", 1, 0]}
+                        ]}, {"$sum": [
+                            {"$cond": ["$$size_tugas", 1, 0]},
+                            {"$cond": ["$$size_ptpas", 1, 0]},
+                            {"$cond": ["$$size_duh", 1, 0]}
+                        ]}, 
+                    1]}
+                ]}
+            }}
+        }
+    },
+    {"$sort": {"nis": 1}},
+    {"$sort": {"avg": -1}},
+    {"$project": {
+        "nis": 1,
+        "nama": 1,
+        "wali": {"$arrayElemAt": ["$teacher.nama", 0]},
+        "tahun_masuk": 1,
+        "kelas": 1,
+        "jt": 1,
+        "juh": 1,
+        "w": 1,
+        "jptpas": 1,
+        "avg": {"$divide":[
+            {"$subtract":[
+                {"$multiply":["$avg",100]},
+                {"$mod":[{"$multiply":["$avg",100]}, 1]}
+            ]},
+            100
+    ]}
+    }},
+    {"$group": {
+        "_id": "$tahun_masuk",
+        "data": {"$push": {
+            "nama": "$nama",
+            "w": "$w",
+            "nis": "$nis",
+            "kelas": "$kelas",
+            "rata_rata": "$avg",
+            "wali_kelas": "$wali",
+            "jumlah_uh": "$juh",
+            "jumlah_ptpas": "$jptpas",
+            "jumlah_tugas": "$jt"
+        }}
+    }},
+    {"$sort": {"_id": -1}}
+]

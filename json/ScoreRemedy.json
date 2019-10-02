@@ -1,0 +1,10 @@
+[   
+    {"$group": {
+        "_id": "$nis",
+        "nama": {"$first": "$std.nama"},
+        "nilai_ulangan": {"$first": "$nilai_ulangan"},
+        "kkm": {"$first": "$kkm"},
+        "tanggal_ulangan": {"$first": "$tanggal_ulangan"}
+    }},
+    {"$sort": {"_id": 1}}
+]

@@ -1,0 +1,131 @@
+[
+	{"$lookup": {
+		"from": "c_application_setting",
+		"pipeline": [{"$project": {
+			"kelas_xii": {"$add": ["$tahun_ajaran", -2]},
+			"kelas_xi": {"$add": ["$tahun_ajaran", -1]},
+			"kelas_x": "$tahun_ajaran"
+		}}],
+		"as": "setting" 
+	}},
+	{"$unwind": "$setting"},
+	{"$project": {
+		"nama": 1,
+		"nis": 1,
+		"jurusan": 1,
+		"jenis_kelamin": 1,
+		"tahun_masuk": 1,
+		"setting": 1,
+		"isCurrentStudent": {"$or": [
+			{"$eq": ["$tahun_masuk", "$setting.kelas_x"]},
+			{"$eq": ["$tahun_masuk", "$setting.kelas_xi"]},
+			{"$eq": ["$tahun_masuk", "$setting.kelas_xii"]}
+		]}
+	}},
+	{"$match": {"isCurrentStudent": true}},
+	{"$lookup": {
+		"from": "c_daftar_nilai_uh",
+		"let": {"nis": "$nis", "tahun_ajaran": "$setting.kelas_x"},
+		"pipeline": [
+			{"$match": 
+				{"$and": 
+					[
+						{"$expr": {"$eq": ["$$nis", "$nis"]}}, 
+						{"$expr": {"$eq": ["$$tahun_ajaran", "$tahun_ajaran"]}}
+					]
+				}
+			}
+		],
+		"as": "duh"
+	}},
+	{"$unwind": "$duh"},
+	{"$lookup": {
+        "from": "c_materi",
+        "localField": "duh.materi",
+        "foreignField": "kode_materi",
+        "as": "materi"
+    }},
+    {"$unwind": "$materi"},
+    {
+        "$lookup": {
+            "from": "c_mapel",
+            "localField": "duh.mapel",
+            "foreignField": "kode_mapel",
+            "as": "tmapel"
+        }
+    },
+    {"$unwind": "$tmapel"},
+    {
+        "$group": {
+            "_id": {
+                "nis": "$duh.nis",
+                "day": {"$month": "$duh.tanggal_ulangan"},
+                "mapel": "$tmapel.nama_mapel"
+            },
+            "f": {"$push": {
+                "tanggal_ulangan": "$duh.tanggal_ulangan",
+                "materi": "$materi.nama_materi",
+                "kkm": "$duh.kkm",
+                "nilai_remidi": "$duh.nilai_remidi",
+                "nilai_ulangan": "$duh.nilai_ulangan"
+            }},
+            "jr": {"$push": {"$cond": ["$duh.remidi", 1, 0]}},
+            "ju": {"$sum": 1},
+            "avg": {"$avg": "$duh.nilai_ulangan"}  
+        }
+    },
+    {"$sort": {"f.tanggal_ulangan": 1}},
+    {
+        "$project": {
+            "_id": 1,
+            "f": 1,
+            "jr": 1,
+            "ju": 1,
+            "avg": {"$divide":[
+                {"$subtract":[
+                     {"$multiply":["$avg",100]},
+                     {"$mod":[{"$multiply":["$avg",100]}, 1]}
+                ]},
+                100
+           ]}
+        }
+    },
+    {
+        "$group": {
+            "_id": {
+                "mapel": "$_id.mapel",
+                "nis": "$_id.nis"
+            },
+            "avg_data": {"$push": {
+                "month": "$_id.day",
+                "jumlah_remidi": {"$sum": "$jr"},
+                "avg": "$avg",
+                "date": "$f.tanggal_ulangan",
+                "jumlah_ulangan": "$ju"
+            }},
+            "avg": {"$avg": {
+                "$divide": [{"$trunc": {"$multiply": ["$avg", 100]}}, 100]
+            }},
+            "urai_data": {"$push": {
+                "data": "$f",
+                "bulan": "$_id.day",
+                "date": "$f.tanggal_ulangan"
+            }}
+        }
+    },
+    {"$sort": {"_id.mapel": 1}},
+    {
+        "$group": {
+            "_id": "$_id.nis",
+            "avg": {"$push": {
+                "Rata-rata": "$avg",
+                "mapel": "$_id.mapel"
+            }},
+            "data_mapel": {"$push": {
+                "mapel": "$_id.mapel",
+                "avg_data": "$avg_data",
+                "urai_data": "$urai_data"
+            }}
+        }
+    }
+]

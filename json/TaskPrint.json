@@ -1,0 +1,53 @@
+[
+    {"$lookup": {
+        "from": "c_students",
+		"let": {"nis": "$nis", "tahun_masuk": ["$setting.tahun_ajaran", {"$sum": ["$setting.tahun_ajaran", -1]}, {"$sum": ["$setting.tahun_ajaran", -2]}]},
+		"pipeline": [
+			{"$match": {"$and": [
+				{"$expr": {"$eq": ["$nis", "$$nis"]}},
+				{"$expr": {"$in": ["$tahun_masuk", "$$tahun_masuk"]}}
+			]}}
+		],
+        "as": "std"
+    }},
+    {"$unwind": "$std"},
+    {"$lookup": {
+        "from": "c_mapel",
+		"let": {"kode_mapel": "$mapel", "tahun_ajaran": "$setting.tahun_ajaran"},
+		"pipeline": [
+			{"$match": {"$and": [
+				{"$expr": {"$eq": ["$kode_mapel", "$$kode_mapel"]}},
+				{"$expr": {"$eq": ["$tahun_ajaran", "$$tahun_ajaran"]}}
+			]}}
+		],
+        "as": "mapel"
+    }},
+    {"$unwind": "$mapel"},
+    {"$group": {
+        "_id": "$mapel",
+        "tanggal_tugas": {"$first": "$tanggal_tugas"},
+		"nama_tugas": {"$first": "$nama_tugas"},
+        "mapel": {"$first": "$mapel.nama_mapel"},
+        "rata2": {"$avg": "$nilai_tugas"},
+        "data": {"$push": {
+            "nilai_tugas": "$nilai_tugas",
+            "nama": "$std.nama"
+        }}
+    }},
+    {"$project": {
+        "_id": 0,
+        "tanggal_tugas": {"$dateToString": {"format": "%d-%m-%Y", "date": "$tanggal_tugas", "timezone": "+07:00"}},
+		"nama_tugas": 1,
+        "data": 1,
+        "rata2": {"$divide":[
+            {"$subtract":[
+                {"$multiply":["$rata2",100]},
+                {"$mod":[{"$multiply":["$rata2",100]}, 1]}
+            ]},
+            100
+        ]},
+        "terendah": {"$min": "$data.nilai_tugas"},
+        "tertinggi": {"$max": "$data.nilai_tugas"},
+        "mapel": 1
+    }}	
+]
