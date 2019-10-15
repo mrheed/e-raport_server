@@ -2,10 +2,11 @@ package routehandler
 
 import (
 	"encoding/json"
+	"net/http"
+
 	mod "github.com/syahidnurrohim/restapi/models"
 	tool "github.com/syahidnurrohim/restapi/utils"
 	"go.mongodb.org/mongo-driver/bson"
-	"net/http"
 )
 
 func GetEkstraController(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +56,7 @@ func UpdateDeleteEkstraController(w http.ResponseWriter, r *http.Request) {
 			throw.Error(err.Error())
 			return
 		}
-		if err := ekstra.UpdateEkstraData(body["filter"].(bson.M), body["update"].(bson.M)); err != nil {
+		if err := ekstra.UpdateEkstraData(body["filter"].(map[string]interface{}), body["update"].(map[string]interface{})); err != nil {
 			throw.Error(err.Error())
 			return
 		}

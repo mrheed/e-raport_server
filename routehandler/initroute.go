@@ -42,6 +42,9 @@ func InitRoute() {
 	Router.HandleFunc("/api/ekstra", GetEkstraController).Methods("GET")
 	Router.HandleFunc("/api/ekstra", InsertEkstraController).Methods("POST")
 	Router.HandleFunc("/api/ekstra", UpdateDeleteEkstraController).Methods("PUT", "DELETE", "OPTIONS")
+	Router.HandleFunc("/api/student_ekstra", GetStudentsEkstraController).Methods("GET")
+	Router.HandleFunc("/api/student_ekstra", InsertStudentsEkstraController).Methods("POST")
+	Router.HandleFunc("/api/student_ekstra", DeleteStudentsEkstraController).Methods("DELETE")
 	// Mapel Route
 	Router.HandleFunc("/api/mapel", GetSubjectsController).Methods("GET")
 	Router.HandleFunc("/api/mapel/{id}", GetSubjectController).Methods("GET")

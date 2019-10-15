@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -24,14 +25,17 @@ var DB = map[string]string{
 	"ck":     "c_kelas",
 	"cj":     "c_jurusan",
 	"ckd":    "c_materi",
+	"cse":    "c_students_ekstra",
 	"cdu":    "c_daftar_nilai_uh",
+	"ctgs":   "c_daftar_nilai_tugas",
 	"cas":    "c_application_setting",
 	"cptpas": "c_daftar_nilai_pts_pas",
-	"ctgs":   "c_daftar_nilai_tugas",
 }
 
 // Database url
-var clientURI = "mongodb://localhost:27017"
+var local = "mongodb://localhost:27017"
+var cloud = "mongodb+srv://rapor:erapor@cluster0-ousnv.mongodb.net/test?retryWrites=true&w=majority"
+var clientURI = local
 
 var (
 	client *mongo.Client
@@ -63,6 +67,8 @@ var (
 	NilaiPTPAS *mongo.Collection
 	// NilaiTugas mgo
 	NilaiTugas *mongo.Collection
+	// StudentsEkstra mgo
+	StudentsEkstra *mongo.Collection
 )
 
 func Disconnect() {
@@ -74,7 +80,11 @@ func InitDBAndCollection() {
 
 	rb := bson.NewRegistryBuilder()
 	rb.RegisterTypeMapEntry(bsontype.EmbeddedDocument, reflect.TypeOf(bson.M{}))
-	client, _ = mongo.Connect(context.Background(), options.Client().ApplyURI(clientURI).SetRegistry(rb.Build()))
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(clientURI).SetRegistry(rb.Build()))
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 	Base = client.Database(DB["dbname"])
 
 	Session = Base.Collection(DB["cses"])
@@ -90,9 +100,11 @@ func InitDBAndCollection() {
 	AppSetting = Base.Collection(DB["cas"])
 	NilaiPTPAS = Base.Collection(DB["cptpas"])
 	NilaiTugas = Base.Collection(DB["ctgs"])
+	StudentsEkstra = Base.Collection(DB["cse"])
 
 	tool.CreateUniqueIndex("nis", Student)
 	tool.CreateUniqueIndex("nip", Teacher)
 	tool.CreateUniqueIndex("username", User)
 	tool.CreateUniqueIndex("kode_kelas", Kelas)
+
 }

@@ -110,6 +110,8 @@ func IsEmpty(v interface{}) bool {
 		return v == ""
 	case int, float32, float64:
 		return v == -1
+	case []int:
+		return len(v.([]int)) == 0
 	default:
 		return false
 	}

@@ -80,7 +80,6 @@ func (s *Student) InsertStudents(r *http.Request) (int, error) {
 			continue
 		}
 		d["jurusan"] = bson.M{"tahun_ajaran": appSetting.TahunAjaran, "kode_kelas": jurusan["value"]}
-		delete(d, "Jurusan")
 		verified, err := s.VerifyStruct(d)
 		if err != nil {
 			fmt.Printf("%+v\n", err)

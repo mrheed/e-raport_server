@@ -1,0 +1,54 @@
+
+		[{"$lookup": {
+			"from": "c_application_setting",
+			"pipeline": [
+				{"$project": {
+					"kelas_x": "$tahun_ajaran",
+					"kelas_xi": {"$sum": ["$tahun_ajaran", -1]},
+					"kelas_xii": {"$sum": ["$tahun_ajaran", -2]}
+				}}
+			],
+			"as": "setting"
+		}},
+		{"$unwind": "$setting"},
+		{"$match": {"$and": [
+				{"kode_ekstra": "a"},
+				{"$expr": {"$eq": ["$setting.kelas_x", "$tahun_ajaran"]}}
+			]
+		}},
+		{"$lookup": {
+			"from": "c_students",
+			"let": {"daftar_nis": "$nis"},
+			"pipeline": [
+				{"$match": {"$expr": {"$in": ["$nis", "$$daftar_nis"]}}}
+			],
+			"as": "std"
+		}},
+		{"$unwind": "$std"},
+		{"$lookup": {
+			"from": "c_jurusan",
+			"let": {"kode_kelas": "$std.jurusan.kode_kelas", "tahun_ajaran": "$setting.kelas_x"},
+			"pipeline": [
+				{"$match": 
+					{"$and": [
+						{"$expr": {"$eq": ["$jurusan.kode_kelas", "$$kode_kelas"]}},
+						{"$expr": {"$eq": ["$jurusan.tahun_ajaran", "$$tahun_ajaran"]}}
+					]
+				}}
+			],
+			"as": "jurusan"
+		}},
+		{"$project": {
+			"nis": "$std.nis",
+			"nama": "$std.nama",
+			"kelas": {"$concat": [
+				{"$switch": {
+					"branches": [
+						{"case": {"$eq": ["$std.tahun_masuk", "$kelas_x"]}, "then": "X"},
+						{"case": {"$eq": ["$std.tahun_masuk", "$kelas_xi"]}, "then": "XI"},
+						{"case": {"$eq": ["$std.tahun_masuk", "$kelas_xii"]}, "then": "XII"}
+					],
+					"default": "Other"
+				}}, " ", "$jurusan.nama_jurusan"
+			]}
+		}}]
